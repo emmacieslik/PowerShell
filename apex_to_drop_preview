@@ -1,3 +1,6 @@
+# Edit Source Folder
+# Edit Account List File
+
 # Folder where the source PDF files currently live  
 $sourceFolder = ''  
   
