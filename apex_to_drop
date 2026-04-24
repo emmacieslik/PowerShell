@@ -1,0 +1,117 @@
+# Edit Source Folder
+# Edit Destination Folder
+# Edit Account List File
+
+# Folder where the source PDF files currently live  
+$sourceFolder = ''  
+  
+# Folder where matching files will be copied to  
+$destinationFolder = ''  
+  
+# Text file containing one account number per line  
+$accountListFile = ''  
+  
+# Stop the script if the account list file cannot be found  
+if (-not (Test-Path $accountListFile)) {  
+    Write-Host "Account list file not found: $accountListFile"  
+    Read-Host 'Press Enter to close'  
+    exit  
+}  
+  
+# Stop the script if the source folder cannot be found  
+if (-not (Test-Path $sourceFolder)) {  
+    Write-Host "Source folder not found: $sourceFolder"  
+    Read-Host 'Press Enter to close'  
+    exit  
+}  
+  
+# Read account numbers from the text file  
+# Trim off any spaces at the beginning or end of each line  
+# Ignore blank lines  
+$accountNumbers = Get-Content -Path $accountListFile | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' }  
+  
+# Load all PDF files from the source folder and all subfolders one time   
+$pdfFiles = Get-ChildItem -Path $sourceFolder -File -Filter *.pdf -Recurse  
+  
+# If the destination folder does not already exist, create it  
+if (-not (Test-Path $destinationFolder)) {  
+    New-Item -ItemType Directory -Path $destinationFolder -Force | Out-Null  
+}  
+  
+# Counter for files actually copied  
+$totalCopied = 0  
+  
+# Counter for files skipped because they already existed in the destination  
+$totalSkipped = 0  
+  
+# List of account numbers that had no file match  
+$notFound = @()  
+  
+# Go through each account number from the list  
+foreach ($acct in $accountNumbers) {  
+  
+    # Find PDF files whose file name contains this account number  
+    $matches = $pdfFiles | Where-Object {  
+        $_.BaseName -match [regex]::Escape($acct)  
+    }  
+  
+    # If at least one file matched this account number  
+    if ($matches) {  
+  
+        # Process each matching file  
+        foreach ($file in $matches) {  
+  
+            # Build the full destination file path  
+            $targetFile = Join-Path $destinationFolder $file.Name  
+  
+            # If the file is not already in the destination, copy it  
+            if (-not (Test-Path $targetFile)) {  
+                Copy-Item -Path $file.FullName -Destination $targetFile  
+                $totalCopied++  
+  
+                # Output a result row showing that the file was copied  
+                [PSCustomObject]@{  
+                    Account     = $acct  
+                    CopiedFile  = $file.Name  
+                    Destination = $targetFile  
+                    Status      = 'COPIED'  
+                }  
+            }  
+            else {  
+                # If the file already exists in the destination, skip it  
+                $totalSkipped++  
+  
+                # Output a result row showing that the file was skipped  
+                [PSCustomObject]@{  
+                    Account     = $acct  
+                    CopiedFile  = $file.Name  
+                    Destination = $targetFile  
+                    Status      = 'SKIPPED - ALREADY EXISTS'  
+                }  
+            }  
+        }  
+    }  
+    else {  
+        # If nothing matched, add the account to the not found list  
+        $notFound += $acct  
+  
+        # Output a result row showing no match  
+        [PSCustomObject]@{  
+            Account     = $acct  
+            CopiedFile  = '[NO MATCH]'  
+            Destination = $destinationFolder  
+            Status      = 'NOT FOUND'  
+        }  
+    }  
+}  
+  
+# Show a blank line for readability  
+Write-Host ''  
+  
+# Show final totals  
+Write-Host "Total files copied: $totalCopied"  
+Write-Host "Total files skipped because already existed: $totalSkipped"  
+Write-Host "Total accounts with no match: $($notFound.Count)"  
+  
+# Keep the window open until you press Enter  
+Read-Host 'Press Enter to close'  
