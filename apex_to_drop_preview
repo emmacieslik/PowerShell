@@ -1,0 +1,73 @@
+# Folder where the source PDF files currently live  
+$sourceFolder = ''  
+  
+# Text file containing one account number per line  
+$accountListFile = ''  
+  
+# Stop the script if the account list file cannot be found  
+if (-not (Test-Path $accountListFile)) {  
+    Write-Host "Account list file not found: $accountListFile"  
+    Read-Host 'Press Enter to close'  
+    exit  
+}  
+  
+# Stop the script if the source folder cannot be found  
+if (-not (Test-Path $sourceFolder)) {  
+    Write-Host "Source folder not found: $sourceFolder"  
+    Read-Host 'Press Enter to close'  
+    exit  
+}  
+  
+# Read account numbers from the text file  
+# Trim off any spaces at the beginning or end of each line  
+# Ignore blank lines  
+$accountNumbers = Get-Content -Path $accountListFile | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' }  
+  
+# Load all PDF files from the source folder and all subfolders one time  
+$pdfFiles = Get-ChildItem -Path $sourceFolder -File -Filter *.pdf -Recurse  
+  
+# Counter for total matched files found during preview  
+$totalSelected = 0  
+  
+# Go through each account number from the list  
+foreach ($acct in $accountNumbers) {  
+  
+    # Find PDF files whose file name contains this account number  
+    # BaseName means file name without the .pdf extension  
+    $matches = $pdfFiles | Where-Object {  
+        $_.BaseName -match [regex]::Escape($acct)  
+    }  
+  
+    # If at least one file matched this account number  
+    if ($matches) {  
+  
+        # Show each matching file  
+        foreach ($file in $matches) {  
+            $totalSelected++  
+  
+            # Output a preview row showing the account and the file found  
+            [PSCustomObject]@{  
+                Account  = $acct  
+                Name     = $file.Name  
+                FullName = $file.FullName  
+            }  
+        }  
+    }  
+    else {  
+        # If nothing matched, show NO MATCH for that account number  
+        [PSCustomObject]@{  
+            Account  = $acct  
+            Name     = '[NO MATCH]'  
+            FullName = ''  
+        }  
+    }  
+}  
+  
+# Show a blank line for readability  
+Write-Host ''  
+  
+# Show the total number of files matched  
+Write-Host "Total files selected: $totalSelected"  
+  
+# Keep the window open until you press Enter  
+Read-Host 'Press Enter to close'  
